@@ -10,6 +10,7 @@ import { Label } from "../components/ui/label";
 import { Coins, Lock, Wallet as WalletIcon, Crown, ArrowUpRight, ArrowDownRight, ShieldCheck, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import PayoutAccountCard from "../components/PayoutAccountCard";
+import PayoutStatusTracker from "../components/PayoutStatusTracker";
 import ReferralCard from "../components/ReferralCard";
 
 export default function Wallet() {
@@ -91,6 +92,7 @@ export default function Wallet() {
         </div>
         <p className="text-xs text-slate-400 -mt-4" data-testid="withdraw-only-note">{t("withdraw_only_note", lang)}</p>
 
+        <PayoutStatusTracker account={wallet.payout_account} />
         <PayoutAccountCard key={wallet.payout_account?.submitted_at || "new"} account={wallet.payout_account} onSaved={load} />
         <ReferralCard />
 
