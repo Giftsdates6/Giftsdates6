@@ -2104,6 +2104,7 @@ async def admin_resolve_ticket(tid: str, admin=Depends(get_admin)):
 # ---------- Stripe checkout ----------
 class VipProfileReq(BaseModel):
     services: List[str] = []
+    services_note: str = ""
     price_hour: int = 0
     price_2h: int = 0
     price_3h: int = 0
@@ -2144,6 +2145,7 @@ async def put_vip_profile(req: VipProfileReq, user=Depends(get_current_user)):
         try: _age = max(18, min(99, int(req.age)))
         except Exception: _age = None
     vip = {"services": services,
+           "services_note": (req.services_note or "").strip()[:500],
            "prices": {"hour": max(0, req.price_hour), "h2": max(0, req.price_2h), "h3": max(0, req.price_3h), "night": max(0, req.price_night)},
            "places": places, "client_wants": (req.client_wants or "").strip()[:1000],
            "nickname": (req.nickname or "").strip()[:40], "post_mode": post_mode,

@@ -103,6 +103,9 @@ export default function VipSection({ userId, name, preview }) {
           {v.services.map((s) => <span key={s} className="text-xs px-2.5 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-200">{svcLabel(s, lang)}</span>)}
         </div>
       )}
+      {v.services_note && (
+        <div className="text-sm text-slate-300" data-testid="vip-services-note-view"><span className="text-slate-500">{t("vip_services", lang)}: </span>{v.services_note}</div>
+      )}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-testid="vip-prices">
         {PRICE_KEYS.map((p) => priceFor(p.k) > 0 && (

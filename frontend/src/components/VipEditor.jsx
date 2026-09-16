@@ -20,6 +20,7 @@ export default function VipEditor() {
   const isVip = user?.is_vip || (user?.vip_until && new Date(user.vip_until) > new Date());
   const v = user?.vip || {};
   const [services, setServices] = useState(v.services || []);
+  const [servicesNote, setServicesNote] = useState(v.services_note || "");
   const [prices, setPrices] = useState(v.prices || { hour: "", h2: "", h3: "" });
   const [places, setPlaces] = useState(v.places || []);
   const [wants, setWants] = useState(v.client_wants || "");
@@ -74,7 +75,7 @@ export default function VipEditor() {
     setBusy(true);
     try {
       await api.put("/vip/profile", {
-        services, places, client_wants: wants,
+        services, services_note: servicesNote, places, client_wants: wants,
         price_hour: Number(prices.hour) || 0, price_2h: Number(prices.h2) || 0, price_3h: Number(prices.h3) || 0,
         availability: slots, published: isVip ? published : false,
         nickname, post_mode: postMode,
@@ -223,6 +224,16 @@ export default function VipEditor() {
           searchPlaceholder={t("search", lang)}
           emptyText={t("no_results", lang)}
         />
+        <Textarea
+          data-testid="vip-services-note"
+          rows={2}
+          maxLength={500}
+          value={servicesNote}
+          onChange={(e) => setServicesNote(e.target.value)}
+          placeholder={t("vip_services_note_ph", lang)}
+          className="bg-white/5 border-white/10 mt-2"
+        />
+        <p className="text-[11px] text-slate-500 mt-1">{t("vip_services_note_hint", lang)}</p>
       </div>
 
       <div>
