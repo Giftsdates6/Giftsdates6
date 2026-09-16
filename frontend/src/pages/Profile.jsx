@@ -4,8 +4,7 @@ import { ShieldCheck, Trash2, Eye, EyeOff, MapPin, Loader2, Lock } from "lucide-
 import { api } from "../lib/api";
 import { useApp } from "../context/AppContext";
 import { t } from "../lib/i18n";
-import { detectLocation } from "../lib/geolocate";
-import { Button } from "../components/ui/button";
+import { detectLocation } from "../lib/geolocate";import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { Label } from "../components/ui/label";
@@ -16,7 +15,9 @@ import ProfileDetailsForm from "../components/ProfileDetailsForm";
 import AvailabilityCalendar from "../components/AvailabilityCalendar";
 import VipEditor from "../components/VipEditor";
 import CountrySelect from "../components/CountrySelect";
-import CityField from "../components/CityField";
+import CitySelect from "../components/CitySelect";
+import { normalizeCountry } from "../lib/countries";
+import { matchCuratedCity } from "../lib/cities";
 
 const DETAIL_KEYS = ["relationship_intent", "orientation", "hobbies", "height", "weight", "languages_spoken", "job_title", "income", "income_custom", "kids", "smoking", "drinking", "religion", "bust_size", "penis_size", "date_price", "video_rate", "availability", "availability_time", "availability_slots"];
 
@@ -36,8 +37,16 @@ export default function Profile() {
     setLocating(true);
     try {
       const { lat, lng, city, country } = await detectLocation(lang);
-      setF((prev) => ({ ...prev, lat, lng, city: city || prev.city, country: country || prev.country }));
-      toast.success(t("location_detected", lang) + (city ? ` · ${city}${country ? ", " + country : ""}` : ""));
+      const normCountry = normalizeCountry(country);
+      const nearestCity = matchCuratedCity(city, normCountry);
+      setF((prev) => ({
+        ...prev,
+        lat,
+        lng,
+        country: normCountry || prev.country,
+        city: nearestCity || prev.city,
+      }));
+      toast.success(t("location_detected", lang) + (nearestCity ? ` · ${nearestCity}${normCountry ? ", " + normCountry : ""}` : ""));
     } catch {
       toast.error(t("location_failed", lang));
     } finally {
@@ -100,9 +109,9 @@ export default function Profile() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div><Label className="text-xs text-slate-400">{t("country", lang)}</Label>
-              <CountrySelect testid="profile-country-select" value={f.country} onChange={v => setF({ ...f, country: v })} lang={lang} /></div>
+              <CountrySelect testid="profile-country-select" value={f.country} onChange={v => setF({ ...f, country: v, city: "" })} lang={lang} /></div>
             <div><Label className="text-xs text-slate-400">{t("city", lang)}</Label>
-              <CityField testid="profile-city-input" value={f.city} onChange={v => setF({ ...f, city: v })} lang={lang} /></div>
+              <CitySelect testid="profile-city-select" value={f.city} country={f.country} onChange={v => setF({ ...f, city: v })} lang={lang} /></div>
           </div>
           <button
             type="button"
