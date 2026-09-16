@@ -12,6 +12,7 @@ import { Switch } from "./ui/switch";
 import { VIP_CATEGORIES, VIP_PLACES, PRICE_KEYS, svcLabel, catTitle, placeLabel, priceLabel } from "../lib/vipCatalog";
 import CountrySelect from "./CountrySelect";
 import CityField from "./CityField";
+import MultiSelect from "./MultiSelect";
 
 export default function VipEditor() {
   const { user, refreshUser, lang } = useApp();
@@ -207,17 +208,22 @@ export default function VipEditor() {
         </div>
       </div>
 
-      {VIP_CATEGORIES.map((cat) => (
-        <div key={cat.key} data-testid={`vip-cat-${cat.key}`}>
-          <div className="text-sm font-semibold text-amber-200 mb-2">{catTitle(cat.key, lang)}</div>
-          <div className="flex flex-wrap gap-2">
-            {cat.items.map((it) => (
-              <button key={it} data-testid={`vip-svc-${it}`} onClick={() => toggle(services, setServices, it)}
-                className={`text-xs px-2.5 py-1.5 rounded-full border transition-colors ${services.includes(it) ? "bg-rose-500/20 border-rose-500/50 text-rose-200" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"}`}>{svcLabel(it, lang)}</button>
-            ))}
-          </div>
-        </div>
-      ))}
+      <div data-testid="vip-services">
+        <div className="text-sm font-semibold text-amber-200 mb-2">{t("vip_services", lang)}</div>
+        <MultiSelect
+          testid="vip-services-select"
+          accent="rose"
+          value={services}
+          onChange={setServices}
+          groups={VIP_CATEGORIES.map((cat) => ({
+            label: catTitle(cat.key, lang),
+            options: cat.items.map((it) => ({ value: it, label: svcLabel(it, lang) })),
+          }))}
+          placeholder={t("vip_services_ph", lang)}
+          searchPlaceholder={t("search", lang)}
+          emptyText={t("no_results", lang)}
+        />
+      </div>
 
       <div>
         <div className="text-sm font-semibold text-amber-200 mb-2">{t("vip_prices", lang)}</div>
@@ -233,12 +239,16 @@ export default function VipEditor() {
 
       <div>
         <div className="text-sm font-semibold text-amber-200 mb-2">{t("vip_place", lang)}</div>
-        <div className="flex gap-2 flex-wrap">
-          {VIP_PLACES.map((p) => (
-            <button key={p.v} data-testid={`vip-place-${p.v}`} onClick={() => toggle(places, setPlaces, p.v)}
-              className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${places.includes(p.v) ? "bg-amber-500/20 border-amber-500/50 text-amber-200" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"}`}>{placeLabel(p.v, lang)}</button>
-          ))}
-        </div>
+        <MultiSelect
+          testid="vip-places-select"
+          accent="amber"
+          value={places}
+          onChange={setPlaces}
+          options={VIP_PLACES.map((p) => ({ value: p.v, label: placeLabel(p.v, lang) }))}
+          placeholder={t("vip_place_ph", lang)}
+          searchPlaceholder={t("search", lang)}
+          emptyText={t("no_results", lang)}
+        />
       </div>
 
       <div>

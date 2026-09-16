@@ -23,6 +23,7 @@ const DOCS = [["bank_statement_path", "bank_statement"], ["proof_of_address_path
 export default function PayoutAccountCard({ account, onSaved }) {
   const { lang, user } = useApp();
   const [edit, setEdit] = useState(!account);
+  const [docsMode, setDocsMode] = useState(false);
   const [f, setF] = useState(Object.fromEntries([...ALL, ...DOCS.map(([k]) => k)].map(k => [k, account?.[k] || (k === "recipient_email" ? user?.email || "" : "")])));
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(null);
@@ -47,7 +48,7 @@ export default function PayoutAccountCard({ account, onSaved }) {
     if (missing.length) { toast.error(t("fill_all", lang)); return; }
     if (!f.bank_statement_path || !f.proof_of_address_path) { toast.error(t("docs_required", lang)); return; }
     setBusy(true);
-    try { await api.post("/wallet/payout-account", f); toast.success(t("status_pending", lang)); setEdit(false); onSaved?.(); }
+    try { await api.post("/wallet/payout-account", f); toast.success(t("status_pending", lang)); setEdit(false); setDocsMode(false); onSaved?.(); }
     catch (e) { toast.error(e.response?.data?.detail || t("failed", lang)); } finally { setBusy(false); }
   };
 
@@ -58,25 +59,17 @@ export default function PayoutAccountCard({ account, onSaved }) {
     </div>
   );
 
-  const DocUpload = ([k, label]) => {
-    const ref = useRef(null);
-    const done = !!f[k];
-    return (
-      <div key={k}>
-        <Label className="text-xs text-slate-400">{t(label, lang)} *</Label>
-        <input ref={ref} data-testid={`payout-${k.replace(/_/g, "-")}-input`} type="file" accept="image/*,application/pdf" className="hidden" onChange={e => uploadDoc(k, e.target.files?.[0])} />
-        <button
-          type="button"
-          data-testid={`payout-${k.replace(/_/g, "-")}-upload`}
-          onClick={() => ref.current?.click()}
-          className={`mt-1 w-full inline-flex items-center justify-center gap-2 h-9 rounded-lg border text-sm transition-colors ${done ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-300" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"}`}
-        >
-          {uploading === k ? <UploadCloud size={14} className="animate-pulse" /> : done ? <Check size={14} /> : <FileText size={14} />}
-          {uploading === k ? t("uploading", lang) : done ? t("uploaded", lang) : t("upload_document", lang)}
-        </button>
-      </div>
-    );
-  };
+  const renderDoc = ([k, label]) => (
+    <DocUploadField
+      key={k}
+      fieldKey={k}
+      label={label}
+      done={!!f[k]}
+      uploading={uploading === k}
+      onPick={(file) => uploadDoc(k, file)}
+      lang={lang}
+    />
+  );
 
   return (
     <div className="glass rounded-2xl p-5" data-testid="payout-account-card">
@@ -88,14 +81,34 @@ export default function PayoutAccountCard({ account, onSaved }) {
             {account && !edit && <div className="text-xs text-slate-400">{account.holder_name} · {account.bank_name} · ····{account.iban.slice(-4)} · {account.swift}</div>}
           </div>
         </div>
-        {st && !edit && (
+        {st && !edit && !docsMode && (
           <div className="flex items-center gap-2">
             <span data-testid="payout-account-status" className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-xs ${st.cls}`}><st.icon size={12} /> {t(st.key, lang)}</span>
             {account.status !== "verified" && <Button data-testid="payout-account-edit-button" size="sm" variant="outline" onClick={() => setEdit(true)} className="bg-white/5 border-white/10">✎</Button>}
           </div>
         )}
       </div>
-      {account?.status === "rejected" && account.reason && !edit && <div className="mt-2 text-xs text-rose-300">{account.reason}</div>}
+      {account?.status === "rejected" && account.reason && !edit && !docsMode && <div className="mt-2 text-xs text-rose-300" data-testid="payout-reject-reason">{account.reason}</div>}
+      {account?.status === "rejected" && !edit && !docsMode && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button data-testid="payout-replace-docs-button" size="sm" onClick={() => { setF(prev => ({ ...prev, bank_statement_path: "", proof_of_address_path: "" })); setDocsMode(true); }} className="rose-btn text-white border-0 h-9"><FileText size={14} className="me-1" /> {t("replace_documents", lang)}</Button>
+          <Button data-testid="payout-edit-all-button" size="sm" variant="outline" onClick={() => setEdit(true)} className="bg-white/5 border-white/10 h-9">{t("edit_all_details", lang)}</Button>
+        </div>
+      )}
+      {docsMode && !edit && (
+        <div className="mt-4 space-y-4" data-testid="payout-docs-only">
+          <p className="text-xs text-slate-400">{t("replace_documents_hint", lang)}</p>
+          <div className="text-xs text-slate-500">{account.holder_name} · {account.bank_name} · ····{account.iban.slice(-4)}</div>
+          <div>
+            <div className="text-xs uppercase tracking-widest text-slate-500 font-mono mb-2 flex items-center gap-1"><FileText size={12} /> {t("documents", lang)}</div>
+            <div className="grid sm:grid-cols-2 gap-3">{DOCS.map(renderDoc)}</div>
+          </div>
+          <div className="flex gap-2">
+            <Button data-testid="payout-docs-submit-button" disabled={busy} onClick={submit} className="rose-btn text-white border-0 h-10">{t("resubmit", lang)}</Button>
+            <Button variant="ghost" onClick={() => setDocsMode(false)} className="text-slate-400">{t("cancel", lang)}</Button>
+          </div>
+        </div>
+      )}
       {edit && (
         <div className="mt-4 space-y-5">
           <p className="text-xs text-slate-400" data-testid="payout-verification-intro">{t("verification_intro", lang)}</p>
@@ -115,7 +128,7 @@ export default function PayoutAccountCard({ account, onSaved }) {
           <div>
             <div className="text-xs uppercase tracking-widest text-slate-500 font-mono mb-2 flex items-center gap-1"><FileText size={12} /> {t("documents", lang)}</div>
             <p className="text-xs text-slate-500 mb-2">{t("documents_hint", lang)}</p>
-            <div className="grid sm:grid-cols-2 gap-3">{DOCS.map(DocUpload)}</div>
+            <div className="grid sm:grid-cols-2 gap-3">{DOCS.map(renderDoc)}</div>
           </div>
           <div className="flex gap-2">
             <Button data-testid="payout-account-submit-button" disabled={busy} onClick={submit} className="rose-btn text-white border-0 h-10">{t("submit_verification", lang)}</Button>
@@ -123,6 +136,29 @@ export default function PayoutAccountCard({ account, onSaved }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+
+// Standalone upload field so its useRef hook belongs to itself (not the parent),
+// avoiding rules-of-hooks issues when the doc section mounts/unmounts.
+function DocUploadField({ fieldKey, label, done, uploading, onPick, lang }) {
+  const ref = useRef(null);
+  const tid = fieldKey.replace(/_/g, "-");
+  return (
+    <div>
+      <Label className="text-xs text-slate-400">{t(label, lang)} *</Label>
+      <input ref={ref} data-testid={`payout-${tid}-input`} type="file" accept="image/*,application/pdf" className="hidden" onChange={e => onPick(e.target.files?.[0])} />
+      <button
+        type="button"
+        data-testid={`payout-${tid}-upload`}
+        onClick={() => ref.current?.click()}
+        className={`mt-1 w-full inline-flex items-center justify-center gap-2 h-9 rounded-lg border text-sm transition-colors ${done ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-300" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"}`}
+      >
+        {uploading ? <UploadCloud size={14} className="animate-pulse" /> : done ? <Check size={14} /> : <FileText size={14} />}
+        {uploading ? t("uploading", lang) : done ? t("uploaded", lang) : t("upload_document", lang)}
+      </button>
     </div>
   );
 }
