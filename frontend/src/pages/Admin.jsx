@@ -126,6 +126,11 @@ export default function Admin() {
                 <div className="text-xs text-slate-500">{[a.recipient_street, a.recipient_city, a.recipient_province, a.recipient_postal_code, a.country].filter(Boolean).join(", ")}</div>
                 <div className="text-xs text-slate-400 font-mono mt-1">{a.bank_name} · {a.iban} · SWIFT {a.swift}{a.routing_number ? ` · RTN ${a.routing_number}` : ""}</div>
                 <div className="text-xs text-slate-500">{[a.bank_street, a.bank_city, a.bank_province, a.bank_postal_code, a.bank_country].filter(Boolean).join(", ")}</div>
+                <div className="flex flex-wrap gap-2 mt-1.5">
+                  {a.bank_statement_path && <a href={fileUrl(a.bank_statement_path)} target="_blank" rel="noreferrer" className="text-xs text-emerald-300 underline" data-testid={`admin-account-bank-statement-${a.user_id}`}>{t("bank_statement", lang)}</a>}
+                  {a.proof_of_address_path && <a href={fileUrl(a.proof_of_address_path)} target="_blank" rel="noreferrer" className="text-xs text-emerald-300 underline" data-testid={`admin-account-proof-address-${a.user_id}`}>{t("proof_of_address", lang)}</a>}
+                  {a.document_path && <a href={fileUrl(a.document_path)} target="_blank" rel="noreferrer" className="text-xs text-slate-300 underline">{t("document", lang)}</a>}
+                </div>
               </div>
               <Button data-testid={`admin-approve-${a.user_id}`} size="sm" onClick={() => verify(a.user_id, true)} className="bg-emerald-600 hover:bg-emerald-500 text-white border-0">{t("approve", lang)}</Button>
               <Button data-testid={`admin-reject-${a.user_id}`} size="sm" variant="outline" onClick={() => verify(a.user_id, false)} className="bg-rose-500/10 border-rose-500/40 text-rose-300">{t("reject", lang)}</Button>

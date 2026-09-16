@@ -44,6 +44,8 @@ export default function Wallet() {
     catch { toast.error(t("failed", lang)); }
   };
   const verified = wallet.payout_account?.status === "verified";
+  const idVerified = user?.verified === true;
+  const canWithdraw = verified && idVerified;
   const fee = Math.round(wdForm.amount * wallet.withdraw_commission * 100) / 100;
   const net = Math.round((wdForm.amount - fee) * 100) / 100;
   const netUsd = net / wallet.coins_per_usd;
@@ -53,6 +55,7 @@ export default function Wallet() {
     try { await api.post("/wallet/withdraw", { amount: wdForm.amount }); await refreshUser(); await load(); toast.success(t("withdrawal_requested", lang)); setWdOpen(false); }
     catch (e) {
       const d = e.response?.data?.detail || "";
+      if (d === "IDENTITY_NOT_VERIFIED") { toast.error(t("need_verified_badge", lang)); return; }
       toast.error(d.startsWith("MIN_WITHDRAW:") ? t("min_withdraw_err", lang).replace("{n}", d.split(":")[1]) : d || t("failed", lang));
     }
   };
@@ -225,7 +228,8 @@ export default function Wallet() {
         <DialogContent className="bg-[#161320] border-white/10 text-white max-w-md">
           <DialogHeader><DialogTitle className="font-serif-luxe text-2xl">{t("withdraw", lang)}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            {!verified && <div data-testid="withdraw-verify-warning" className="text-sm text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">⚠️ {t("verify_bank_first", lang)}</div>}
+            {!idVerified && <div data-testid="withdraw-badge-warning" className="text-sm text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">⚠️ {t("need_verified_badge", lang)}</div>}
+            {idVerified && !verified && <div data-testid="withdraw-verify-warning" className="text-sm text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">⚠️ {t("verify_bank_first", lang)}</div>}
             <div><Label className="text-xs text-slate-400">{t("withdraw_amount", lang)}</Label>
               <Input data-testid="withdraw-amount-input" type="number" min="100" max={user?.withdrawable} value={wdForm.amount} onChange={e => setWdForm({ amount: parseFloat(e.target.value||0) })} className="bg-white/5 border-white/10 mt-1"/></div>
             {verified && <div className="text-xs text-slate-400">{t("bank", lang)}: {wallet.payout_account.bank_name} ····{wallet.payout_account.iban.slice(-4)}</div>}
@@ -234,7 +238,7 @@ export default function Wallet() {
               <div className="flex justify-between"><span>{t("you_receive", lang)}</span><span className={belowMin ? "text-rose-300" : "text-emerald-300"}>🪙 {net} ≈ ${netUsd.toFixed(2)}</span></div>
               <div data-testid="withdraw-min-note" className={`text-xs ${belowMin ? "text-rose-300" : "text-slate-500"}`}>{t("min_withdraw_note", lang).replace("{n}", wallet.min_withdraw_usd).replace("{c}", minCoins)}</div>
             </div>
-            <Button data-testid="wallet-withdraw-submit-button" disabled={!verified || belowMin} onClick={withdraw} className="rose-btn text-white border-0 w-full h-11">{t("withdraw", lang)}</Button>
+            <Button data-testid="wallet-withdraw-submit-button" disabled={!canWithdraw || belowMin} onClick={withdraw} className="rose-btn text-white border-0 w-full h-11">{t("withdraw", lang)}</Button>
           </div>
         </DialogContent>
       </Dialog>

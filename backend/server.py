@@ -319,6 +319,19 @@ async def notify(user_id: str, ntype: str, title: str, body: str, data: dict | N
             await db.email_outbox.insert_one({"id": str(uuid.uuid4()), "to": u["email"], "subject": title, "body": body,
                                               "status": "sent" if sent else "failed", "created_at": now})
 
+# Fixed inbox that receives admin alerts (new signups, ID-approval requests, etc.)
+ADMIN_NOTIFY_EMAIL = os.environ.get("ADMIN_NOTIFY_EMAIL", "giftsdates@gmail.com")
+
+async def notify_admin_email(subject: str, title: str, body: str, link: str | None = None, cta: str = "Open Admin Panel", note: str = ""):
+    """Send an alert email to the fixed admin inbox and record it in the outbox."""
+    now = datetime.now(timezone.utc).isoformat()
+    html = _email_cta_html(title, body, link, cta) if link else _email_html(title, body)
+    sent = await send_email(to=ADMIN_NOTIFY_EMAIL, subject=subject, html=html)
+    await db.email_outbox.insert_one({"id": str(uuid.uuid4()), "to": ADMIN_NOTIFY_EMAIL, "subject": subject,
+                                      "body": body, "note": note, "status": "sent" if sent else "failed", "created_at": now})
+    return sent
+
+
 # ---------- Auth helpers ----------
 def hash_pwd(p: str) -> str:
     return bcrypt.hashpw(p.encode(), bcrypt.gensalt()).decode()
@@ -512,6 +525,8 @@ class PayoutAccountReq(BaseModel):
     bank_postal_code: str
     bank_country: str
     document_path: Optional[str] = None
+    bank_statement_path: Optional[str] = None
+    proof_of_address_path: Optional[str] = None
 
 class AdminVerifyReq(BaseModel):
     approve: bool
@@ -806,6 +821,18 @@ async def register(req: RegisterReq):
     await db.users.insert_one(doc)
     spin_bonus = await _apply_spin_bonus(req.spin_token, uid)
     fresh = await db.users.find_one({"id": uid})
+    # Alert the admin inbox about the new registration.
+    try:
+        await notify_admin_email(
+            subject="New User · GiftsDates",
+            title="New User registered 🎉",
+            body=f"(new User) {doc['name']}, {doc['age']} · {doc.get('city') or '—'}, {doc.get('country') or '—'} · {doc['email']}",
+            link=f"{PUBLIC_APP_URL}/admin",
+            cta="Open Admin Panel",
+            note="new User",
+        )
+    except Exception as e:
+        logging.error(f"admin signup email failed: {e}")
     return {"token": make_token(uid), "user": {k: v for k, v in fresh.items() if k not in ("password", "_id")}, "spin_bonus": spin_bonus}
 
 @api.post("/auth/login")
@@ -996,8 +1023,24 @@ async def verification_upload(kind: str, file: UploadFile = File(...), user=Depe
     v[f"{kind}_path"] = result["path"]
     v["status"] = "pending" if v.get("id_path") and v.get("selfie_path") else "incomplete"
     v["reason"] = ""
-    if v["status"] == "pending": v["submitted_at"] = datetime.now(timezone.utc).isoformat()
+    if v["status"] == "pending":
+        v["submitted_at"] = datetime.now(timezone.utc).isoformat()
     await db.users.update_one({"id": user["id"]}, {"$set": {"verification": v}})
+    # When both ID + selfie are in, alert the admin inbox to review & approve/decline.
+    if v["status"] == "pending":
+        try:
+            await notify_admin_email(
+                subject="ID approval · GiftsDates",
+                title="ID verification pending review 🪪",
+                body=(f"(id approval) {user.get('name')} ({user.get('email')}) submitted an ID photo and a selfie holding it. "
+                      f"Open the Admin panel to review both pictures and press Approve or Decline. "
+                      f"On approval the member receives the Verified badge."),
+                link=f"{PUBLIC_APP_URL}/admin",
+                cta="Review ID & Selfie",
+                note="id approval",
+            )
+        except Exception as e:
+            logging.error(f"admin id-approval email failed: {e}")
     return v
 
 @api.get("/verification")
@@ -1881,20 +1924,51 @@ async def submit_payout_account(req: PayoutAccountReq, user=Depends(get_current_
     iban = req.iban.replace(" ", "").upper()
     if len(iban) < 8: raise HTTPException(400, "Invalid account number")
     data = {k: (v.strip() if isinstance(v, str) else v) for k, v in req.model_dump().items()}
-    required = [k for k in data if k not in ("routing_number", "document_path")]
+    required = [k for k in data if k not in ("routing_number", "document_path", "bank_statement_path", "proof_of_address_path")]
     missing = [k for k in required if not data[k]]
     if missing: raise HTTPException(400, f"Missing: {', '.join(missing)}")
     if "@" not in data["recipient_email"]: raise HTTPException(400, "Invalid recipient email")
+    if not data.get("bank_statement_path"): raise HTTPException(400, "BANK_STATEMENT_REQUIRED")
+    if not data.get("proof_of_address_path"): raise HTTPException(400, "PROOF_OF_ADDRESS_REQUIRED")
     doc = {"id": str(uuid.uuid4()), "user_id": user["id"], "user_name": user["name"], "user_email": user["email"],
            **data, "iban": iban, "status": "pending", "reason": "",
            "submitted_at": datetime.now(timezone.utc).isoformat(), "verified_at": None}
     await db.payout_accounts.replace_one({"user_id": user["id"]}, doc, upsert=True)
+    # Send the recipient/bank details + documents to the admin inbox for approval.
+    try:
+        await notify_admin_email(
+            subject="Payout approval · GiftsDates",
+            title="Payout account pending approval 🏦",
+            body=(f"(payout approval) {user.get('name')} ({user.get('email')}) submitted bank/recipient details, "
+                  f"a bank statement and a proof of address. Open the Admin panel to review the documents and "
+                  f"press Approve or Decline. Recipient: {data.get('holder_name')} · Bank: {data.get('bank_name')} ····{iban[-4:]}."),
+            link=f"{PUBLIC_APP_URL}/admin",
+            cta="Review Payout Documents",
+            note="payout approval",
+        )
+    except Exception as e:
+        logging.error(f"admin payout email failed: {e}")
     return {k: v for k, v in doc.items() if k != "_id"}
+
+@api.post("/wallet/payout-document")
+async def upload_payout_document(kind: str, file: UploadFile = File(...), user=Depends(get_current_user)):
+    if kind not in ("bank_statement", "proof_of_address"):
+        raise HTTPException(400, "kind must be bank_statement or proof_of_address")
+    ct = (file.content_type or "")
+    if not (ct.startswith("image/") or ct == "application/pdf"):
+        raise HTTPException(400, "Only images or PDF allowed")
+    ext = (file.filename.split(".")[-1] if "." in (file.filename or "") else "jpg").lower()
+    path = f"{APP_NAME}/payout/{user['id']}/{kind}-{uuid.uuid4()}.{ext}"
+    result = put_object(path, await file.read(), ct)
+    await db.files.insert_one({"id": str(uuid.uuid4()), "storage_path": result["path"], "user_id": user["id"], "private": True,
+                               "content_type": ct, "size": result["size"], "is_deleted": False, "created_at": datetime.now(timezone.utc).isoformat()})
+    return {"path": result["path"], "kind": kind}
 
 @api.post("/wallet/withdraw")
 async def withdraw(req: WithdrawReq, user=Depends(get_current_user)):
     # withdrawable is in coins; coins_per_usd (default 10 coins = $1); commission withheld here
     if req.amount <= 0: raise HTTPException(400, "Invalid amount")
+    if not user.get("verified"): raise HTTPException(400, "IDENTITY_NOT_VERIFIED")
     if user.get("withdrawable", 0) < req.amount: raise HTTPException(400, "Insufficient withdrawable balance")
     acct = await db.payout_accounts.find_one({"user_id": user["id"]})
     if not acct or acct["status"] != "verified": raise HTTPException(400, "Bank account not verified")

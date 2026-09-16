@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Landmark, ShieldCheck, Clock, XCircle, User } from "lucide-react";
+import React, { useState, useRef } from "react";
+import { Landmark, ShieldCheck, Clock, XCircle, User, FileText, UploadCloud, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -18,17 +18,34 @@ const RECIPIENT = [["tax_id", "tax_id"], ["holder_name", "full_name"], ["recipie
 const BANK = [["iban", "account_number"], ["swift", "swift_code"], ["routing_number", "routing_number"], ["bank_name", "bank_name"], ["bank_street", "bank_street"], ["bank_city", "bank_city"], ["bank_province", "bank_province"], ["bank_postal_code", "bank_postal_code"], ["bank_country", "bank_country"]];
 const ALL = [...RECIPIENT, ...BANK].map(([k]) => k);
 const OPTIONAL = new Set(["routing_number"]);
+const DOCS = [["bank_statement_path", "bank_statement"], ["proof_of_address_path", "proof_of_address"]];
 
 export default function PayoutAccountCard({ account, onSaved }) {
   const { lang, user } = useApp();
   const [edit, setEdit] = useState(!account);
-  const [f, setF] = useState(Object.fromEntries(ALL.map(k => [k, account?.[k] || (k === "recipient_email" ? user?.email || "" : "")])));
+  const [f, setF] = useState(Object.fromEntries([...ALL, ...DOCS.map(([k]) => k)].map(k => [k, account?.[k] || (k === "recipient_email" ? user?.email || "" : "")])));
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(null);
   const st = account && STATUS[account.status];
+  const isVerified = user?.verified === true;
+
+  const uploadDoc = async (kind, file) => {
+    if (!file) return;
+    setUploading(kind);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const { data } = await api.post(`/wallet/payout-document?kind=${kind === "bank_statement_path" ? "bank_statement" : "proof_of_address"}`, fd, { headers: { "Content-Type": "multipart/form-data" } });
+      setF(prev => ({ ...prev, [kind]: data.path }));
+      toast.success(t("uploaded", lang));
+    } catch (e) { toast.error(e.response?.data?.detail || t("failed", lang)); }
+    finally { setUploading(null); }
+  };
 
   const submit = async () => {
     const missing = ALL.filter(k => !OPTIONAL.has(k) && !String(f[k] || "").trim());
     if (missing.length) { toast.error(t("fill_all", lang)); return; }
+    if (!f.bank_statement_path || !f.proof_of_address_path) { toast.error(t("docs_required", lang)); return; }
     setBusy(true);
     try { await api.post("/wallet/payout-account", f); toast.success(t("status_pending", lang)); setEdit(false); onSaved?.(); }
     catch (e) { toast.error(e.response?.data?.detail || t("failed", lang)); } finally { setBusy(false); }
@@ -40,6 +57,26 @@ export default function PayoutAccountCard({ account, onSaved }) {
       <Input data-testid={`payout-${k.replace(/_/g, "-")}-input`} type={k === "recipient_email" ? "email" : "text"} value={f[k]} onChange={e => setF({ ...f, [k]: e.target.value })} className={`bg-white/5 border-white/10 mt-1 h-9 ${["iban", "swift", "routing_number", "tax_id"].includes(k) ? "font-mono" : ""}`} />
     </div>
   );
+
+  const DocUpload = ([k, label]) => {
+    const ref = useRef(null);
+    const done = !!f[k];
+    return (
+      <div key={k}>
+        <Label className="text-xs text-slate-400">{t(label, lang)} *</Label>
+        <input ref={ref} data-testid={`payout-${k.replace(/_/g, "-")}-input`} type="file" accept="image/*,application/pdf" className="hidden" onChange={e => uploadDoc(k, e.target.files?.[0])} />
+        <button
+          type="button"
+          data-testid={`payout-${k.replace(/_/g, "-")}-upload`}
+          onClick={() => ref.current?.click()}
+          className={`mt-1 w-full inline-flex items-center justify-center gap-2 h-9 rounded-lg border text-sm transition-colors ${done ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-300" : "bg-white/5 border-white/10 text-slate-300 hover:bg-white/10"}`}
+        >
+          {uploading === k ? <UploadCloud size={14} className="animate-pulse" /> : done ? <Check size={14} /> : <FileText size={14} />}
+          {uploading === k ? t("uploading", lang) : done ? t("uploaded", lang) : t("upload_document", lang)}
+        </button>
+      </div>
+    );
+  };
 
   return (
     <div className="glass rounded-2xl p-5" data-testid="payout-account-card">
@@ -62,6 +99,11 @@ export default function PayoutAccountCard({ account, onSaved }) {
       {edit && (
         <div className="mt-4 space-y-5">
           <p className="text-xs text-slate-400" data-testid="payout-verification-intro">{t("verification_intro", lang)}</p>
+          {!isVerified && (
+            <div data-testid="payout-verify-badge-warning" className="flex items-start gap-2 text-xs text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+              <ShieldCheck size={14} className="mt-0.5 shrink-0" /> {t("need_verified_badge", lang)}
+            </div>
+          )}
           <div>
             <div className="text-xs uppercase tracking-widest text-slate-500 font-mono mb-2 flex items-center gap-1"><User size={12} /> {t("recipient_details", lang)}</div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">{RECIPIENT.map(Field)}</div>
@@ -69,6 +111,11 @@ export default function PayoutAccountCard({ account, onSaved }) {
           <div>
             <div className="text-xs uppercase tracking-widest text-slate-500 font-mono mb-2 flex items-center gap-1"><Landmark size={12} /> {t("bank_details", lang)}</div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">{BANK.map(Field)}</div>
+          </div>
+          <div>
+            <div className="text-xs uppercase tracking-widest text-slate-500 font-mono mb-2 flex items-center gap-1"><FileText size={12} /> {t("documents", lang)}</div>
+            <p className="text-xs text-slate-500 mb-2">{t("documents_hint", lang)}</p>
+            <div className="grid sm:grid-cols-2 gap-3">{DOCS.map(DocUpload)}</div>
           </div>
           <div className="flex gap-2">
             <Button data-testid="payout-account-submit-button" disabled={busy} onClick={submit} className="rose-btn text-white border-0 h-10">{t("submit_verification", lang)}</Button>
