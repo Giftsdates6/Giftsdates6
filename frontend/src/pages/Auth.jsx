@@ -12,7 +12,7 @@ import { t } from "../lib/i18n";
 import { LANGUAGES, ZODIAC_EMOJI } from "../lib/i18n";
 import SpinWheel from "../components/SpinWheel";
 import CountrySelect from "../components/CountrySelect";
-import CityField from "../components/CityField";
+import CitySelect from "../components/CitySelect";
 import { Eye, EyeOff, MapPin, Loader2 } from "lucide-react";
 import { detectLocation } from "../lib/geolocate";
 
@@ -200,9 +200,9 @@ export default function Auth() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div><Label className="text-xs text-slate-400">{t("country", lang)}</Label>
-                  <CountrySelect testid="auth-country-select" value={f.country} onChange={v => setF({ ...f, country: v })} lang={lang} /></div>
+                  <CountrySelect testid="auth-country-select" value={f.country} onChange={v => setF({ ...f, country: v, city: "" })} lang={lang} /></div>
                 <div><Label className="text-xs text-slate-400">{t("city", lang)}</Label>
-                  <CityField testid="auth-city-input" required value={f.city} onChange={v => setF({ ...f, city: v })} lang={lang} /></div>
+                  <CitySelect testid="auth-city-select" required value={f.city} country={f.country} onChange={v => setF({ ...f, city: v })} lang={lang} /></div>
               </div>
               <button
                 type="button"

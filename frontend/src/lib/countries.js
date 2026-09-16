@@ -2,7 +2,6 @@
 export const GLOBAL = "Global";
 
 export const COUNTRIES = [
-  { name: "Global", flag: "🌍" },
   { name: "United States", flag: "🇺🇸" },
   { name: "United Kingdom", flag: "🇬🇧" },
   { name: "Canada", flag: "🇨🇦" },
