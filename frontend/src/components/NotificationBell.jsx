@@ -30,7 +30,7 @@ function showBrowserNotification(n) {
   try {
     if (!("Notification" in window) || Notification.permission !== "granted") return;
     if (document.visibilityState === "visible") return;
-    new Notification(n.title, { body: n.body, icon: "/brand-logo.png", tag: n.id });
+    new Notification(n.title, { body: n.body, icon: "/brand-logo.svg", tag: n.id });
   } catch {}
 }
 

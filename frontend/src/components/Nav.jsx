@@ -26,7 +26,7 @@ export default function Nav() {
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-3">
         <Link to={user ? "/browse" : "/"} className="flex items-center gap-2.5 group" data-testid="nav-logo">
           <div className="w-10 h-10 rounded-xl overflow-hidden gold-hairline bg-[#1A0A14] logo-glow flex items-center justify-center">
-            <img src="/brand-logo.png" alt="GiftsDates" className="w-9 h-9 object-contain logo-pulse" />
+            <img src="/brand-logo.svg" alt="GiftsDates" className="w-9 h-9 object-contain logo-pulse" />
           </div>
           <div className="leading-none">
             <span className="font-serif-luxe text-2xl font-bold tracking-tight gold-text">GiftsDates</span>

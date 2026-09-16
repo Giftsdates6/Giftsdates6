@@ -29,7 +29,7 @@ export default function About() {
         <section className="pt-20 pb-16 grid lg:grid-cols-2 gap-14 items-center" data-testid="about-page">
           <div className="float-in">
             <span className="inline-flex items-center gap-2 ps-1.5 pe-3 py-1 rounded-full bg-white/5 gold-hairline text-[#F3E5AB] text-xs font-semibold uppercase tracking-[0.2em]">
-              <img src="/brand-logo.png" alt="" className="w-6 h-6 rounded-full object-cover" /> Our Story
+              <img src="/brand-logo.svg" alt="" className="w-6 h-6 rounded-full object-cover" /> Our Story
             </span>
             <h1 className="mt-6 font-serif-luxe text-5xl sm:text-6xl leading-[0.95] tracking-tight">
               Where intention meets <span className="gold-text">indulgence</span>.

@@ -125,7 +125,7 @@ export default function Auth() {
       <div className="w-full max-w-md glass rounded-3xl p-8 float-in">
         <div className="flex flex-col items-center gap-3 mb-6">
           <div className="w-20 h-20 rounded-2xl overflow-hidden gold-hairline bg-[#1A0A14] logo-glow">
-            <img src="/brand-logo.png" alt="GiftsDates" className="w-full h-full object-cover" />
+            <img src="/brand-logo.svg" alt="GiftsDates" className="w-full h-full object-contain p-2" />
           </div>
           <h2 className="font-serif-luxe text-3xl gold-text">{mode === "login" ? t("login", lang) : t("register", lang)}</h2>
         </div>
