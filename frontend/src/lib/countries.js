@@ -104,3 +104,40 @@ export const countryFlag = (name) => {
   const c = COUNTRIES.find((x) => x.name.toLowerCase() === (name || "").toLowerCase());
   return c ? c.flag : "";
 };
+
+// Map a detected/reverse-geocoded country name to a name in COUNTRIES.
+// Handles common aliases and official long-form names.
+const COUNTRY_ALIASES = {
+  "united states of america": "United States",
+  "usa": "United States",
+  "us": "United States",
+  "united kingdom of great britain and northern ireland": "United Kingdom",
+  "great britain": "United Kingdom",
+  "uk": "United Kingdom",
+  "russian federation": "Russia",
+  "czech republic": "Czechia",
+  "republic of korea": "South Korea",
+  "korea (republic of)": "South Korea",
+  "korea, republic of": "South Korea",
+  "uae": "United Arab Emirates",
+  "united arab emirates (the)": "United Arab Emirates",
+  "viet nam": "Vietnam",
+  "türkiye": "Turkey",
+  "turkiye": "Turkey",
+  "hong kong sar china": "Hong Kong",
+  "hong kong sar": "Hong Kong",
+};
+
+export const normalizeCountry = (detected) => {
+  const raw = (detected || "").trim();
+  if (!raw) return "";
+  const d = raw.toLowerCase();
+  const exact = COUNTRIES.find((c) => c.name.toLowerCase() === d);
+  if (exact) return exact.name;
+  if (COUNTRY_ALIASES[d]) return COUNTRY_ALIASES[d];
+  const partial = COUNTRIES.find((c) => {
+    const lc = c.name.toLowerCase();
+    return d.includes(lc) || lc.includes(d);
+  });
+  return partial ? partial.name : raw;
+};

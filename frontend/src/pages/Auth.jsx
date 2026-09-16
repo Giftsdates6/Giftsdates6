@@ -15,6 +15,8 @@ import CountrySelect from "../components/CountrySelect";
 import CitySelect from "../components/CitySelect";
 import { Eye, EyeOff, MapPin, Loader2 } from "lucide-react";
 import { detectLocation } from "../lib/geolocate";
+import { normalizeCountry } from "../lib/countries";
+import { matchCuratedCity } from "../lib/cities";
 
 const MONTHS = [1,2,3,4,5,6,7,8,9,10,11,12];
 const DAYS = Array.from({ length: 31 }, (_, i) => i + 1);
@@ -69,8 +71,16 @@ export default function Auth() {
     setLocating(true);
     try {
       const { lat, lng, city, country } = await detectLocation(lang);
-      setF((prev) => ({ ...prev, lat, lng, city: city || prev.city, country: country || prev.country }));
-      toast.success(t("location_detected", lang) + (city ? ` · ${city}${country ? ", " + country : ""}` : ""));
+      const normCountry = normalizeCountry(country);
+      const nearestCity = matchCuratedCity(city, normCountry);
+      setF((prev) => ({
+        ...prev,
+        lat,
+        lng,
+        country: normCountry || prev.country,
+        city: nearestCity || prev.city,
+      }));
+      toast.success(t("location_detected", lang) + (nearestCity ? ` · ${nearestCity}${normCountry ? ", " + normCountry : ""}` : ""));
     } catch {
       toast.error(t("location_failed", lang));
     } finally {

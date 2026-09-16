@@ -101,3 +101,27 @@ export const CITIES_BY_COUNTRY = {
 
 // Returns the curated list of cities for a country (empty array if none/unknown).
 export const citiesForCountry = (country) => CITIES_BY_COUNTRY[country] || [];
+
+// Snap a detected/typed city to the best-matching curated city for a country.
+// Returns the canonical curated name when a good match is found, otherwise the
+// original detected city (so it can still be used as a custom entry).
+export const matchCuratedCity = (detectedCity, country) => {
+  const raw = (detectedCity || "").trim();
+  if (!raw) return "";
+  const list = citiesForCountry(country);
+  if (!list.length) return raw;
+  const dc = raw.toLowerCase();
+  // 1) exact (case-insensitive)
+  let hit = list.find((c) => c.toLowerCase() === dc);
+  if (hit) return hit;
+  // 2) one name contains the other (handles "Dubai City" ↔ "Dubai")
+  hit = list.find((c) => {
+    const lc = c.toLowerCase();
+    return dc.includes(lc) || lc.includes(dc);
+  });
+  if (hit) return hit;
+  // 3) shared first word (handles "New York City" ↔ "New York")
+  const dw = dc.split(/[\s,]+/)[0];
+  hit = list.find((c) => c.toLowerCase().split(/[\s,]+/)[0] === dw);
+  return hit || raw;
+};
